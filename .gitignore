@@ -1,0 +1,10 @@
+test
+*.csv
+*.ods
+*.txt
+DUF*
+BACON*
+__pycache__
+Sus*
+Analysis
+Test
