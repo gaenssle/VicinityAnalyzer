@@ -19,10 +19,57 @@ ssl._create_default_https_context = ssl._create_unverified_context
 ## DOWNLOAD FUNCTIONS -----------------------------------------------------------------------------
 ##-------------------------------------------------------------------------------------------------
 ## ================================================================================================
-## SUBFUNCTION: of DownloadProteinEntries()
+## Download all gene IDs associated with the supplied KEGG Orthology (KO)
+def DownloadOrthology(Input):
+	Download = REST.kegg_find("genes",Input).read()
+	List = Download.strip().split("\n")
+	ListOfList = [i.split("\t") for i in List]
+	DataFrame = pd.DataFrame(ListOfList, columns=["ID", "Description"])
+	return(DataFrame["ID"].to_list(), DataFrame)
+
+
+## ================================================================================================
+## Get list of indexes +/- range of the reference gene ID for KEGG
+def GetNeighborIndices(Gene, ManualList, Multi=1, Range=5, Size=4):
+	try:
+		List = []
+		if "_" in Gene and Gene.rsplit("_",1)[1].isdigit():
+			Label = Gene.rsplit("_",1)[0] + "_"
+			Index = int(Gene.rsplit("_",1)[1])
+			Fill = len(Gene.rsplit("_",1)[1])
+		else:
+			Label = Gene[:-Size]
+			Index = int(Gene[-Size:])
+			Fill = Size
+		for i in range(Index-Range*Multi,Index+Range*Multi+1, Multi):
+			if i != Index:
+				NewID = Label + str(i).zfill(Fill)
+				List.append(NewID)
+	except:
+		ManualList.append(Gene)
+	return(List, ManualList)
+
+
+## ================================================================================================
+## Download protein entries from KEGG -> in chunks of 10 gene IDs --> KEGG-get
+def DownloadProteinEntries(List, GeneID):
+	Data = []
+	Entry = []
+	print("Download protein info for", GeneID, ". . .")
+	Download = REST.kegg_get(List).read()
+	Download = Download.split("\n")
+	for Line in Download:
+		if Line.startswith("///"):
+			Data.append(Entry)
+			Entry = []
+		else:
+			Entry.append(Line)
+	return(Data)
+
+## ================================================================================================
 ## Download Info for each protein from KEGG
-def GetDetailedData(Entry, ID):
-	Dict = {"ID": ID, "orgID": ID.split(":",1)[0],"Sequence": ""}
+def GetDetailedData(Entry, GeneID, orgID):
+	Dict = {"Ref": GeneID,"ID": orgID, "orgID": orgID,"Sequence": ""}
 	inAASeq = False
 	for Line in Entry:
 		Line = re.sub("\s\s+" , " ", Line)
@@ -33,79 +80,20 @@ def GetDetailedData(Entry, ID):
 			else:
 				Dict["Sequence"] += Line.strip()
 		if inAASeq == False:
-			if Line.startswith("ORGANISM") or Line.startswith("VIRUS"):
+			if Line.startswith("ENTRY"):
+				Dict["ID"] += ":" + Line.split(" ",2)[1]
+			elif Line.startswith("NAME"):
+				Dict["Description"] = Line.split(" ",1)[1].replace("(GenBank)", "").strip()
+			elif Line.startswith("ORTHOLOGY"):
+				Dict["KO-ID"] = Line.split(" ",2)[1].strip()
+			elif Line.startswith("ORGANISM") or Line.startswith("VIRUS"):
 				Line = Line.split(" ",1)[1].strip()
 				Dict["Organism"] = Line.split(" ",1)[1]
+			elif Line.startswith("MOTIF"):
+				Dict["Domains"] = Line.split(" ",1)[1].replace("Pfam:", "").strip()
 			elif "UniProt" in Line:
 				Dict["UniProt"] = Line.split(" ",1)[1]
 			elif Line.startswith("AASEQ"):
 				Dict["Length"] = Line.split(" ",1)[1]
 				inAASeq = True
 	return(Dict)
-
-## ================================================================================================
-## Download protein entries from KEGG -> in chunks of 10 gene IDs --> KEGG-get
-def DownloadProteinEntries(Chunked_List):
-	Data = []
-	Entry = []
-	print("Download protein info, set of", Chunked_List[0], ". . .")
-	Download = REST.kegg_get(Chunked_List).read()
-	Download = Download.split("\n")
-	Count = 0
-	for Line in Download:
-		if Line.startswith("///"):
-			ProteinData = GetDetailedData(Entry, Chunked_List[Count])
-			Data.append(ProteinData)
-			Entry = []
-			Count += 1
-		else:
-			Entry.append(Line)
-	return(Data)
-
-## ================================================================================================
-## Download all genome taxonomy from KEGG --> KEGG-list
-def DownloadOrganismsTemp(Name="organism"):
-	print("Download organism taxonomy. . .")
-	Entry = REST.kegg_list(Name).read()
-	Entry = Entry.replace(";" , "\t")
-	ColList = ["ID long", "orgID", "Organism", "Kingdom", "Phylum", "Class", "Order"]
-	DataFrame = pd.read_csv(StringIO(Entry), sep="\t", names=ColList)
-	DataFrame["Taxonomy"] = DataFrame["Kingdom"] + "-" + DataFrame["Phylum"]
-	DataFrame = DataFrame[["orgID","Taxonomy"]]
-	print(DataFrame.head())
-	return(DataFrame)
-
-## ================================================================================================
-## Download domain motifs (architecture) for each gene ID from KEGG
-def DownloadMotif(ID):
-	Data = []
-	Domains = []
-	Row = ""
-	inDomains = False
-	Index = 1
-	url = "https://www.kegg.jp/ssdb-bin/ssdb_motif?kid=" + ID
-	with urllib.request.urlopen(url) as File:
-		for Line in File:
-			Line = Line.decode("utf-8").strip().replace(" : ", "")
-			Line = re.sub('<[^>]*>', '|', Line)
-			Line = Line.replace("&nbsp;", "-")
-			Line = Line.split("|")
-			Line = [i for i in Line if i]
-			if Line:
-				Data.append(Line)
-		for Line in Data:
-			if inDomains:
-				if Line[0].startswith("pf:"):
-					if Row:
-						Index += 1
-						Domains.append(Row)
-					Row = [ID, Index, Line[0].split(":",1)[1]] + Line[1:]
-				else:
-					if Line[0].startswith("["):
-						Domains.append(Row)
-						break
-					Row += Line
-			elif Line[0] == "Motif id":
-				inDomains = True
-	print(ID, "downloaded")
-	return(Domains)

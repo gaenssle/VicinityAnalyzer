@@ -1,13 +1,20 @@
-# Domain Analyzer
+# Vicinity Analyzer
 created 2023 by gaenssle
 written in Python 3.8
 
 ## Process 
-- The input is an ID, e.g. domain name (PFAM or UniProt ID)
-- Various databases are accessed via Genome.jp, e.g. KEGG or UnitProt
-- All available protein data associated with the input ID are downloaded
-- The downloaded data is extracted, accumulated and counted
-- Various output files are generated, including FASTA
+- It accepts three types of inputs
+  * A KEGG Orthology (KO) ID (e.g. K22276)
+  * A KEGG gene ID (e.g. cak:Caul_3276)
+  * A file with gene IDs (.txt or .csv)
+- If the input is a KO ID, all associated gene IDs are downloaded first from KEGG
+- Determine if gene IDs of each included KEGG genome are in 1, 5, or 10 increments
+- Download all neighbouring genes within the given range (default= +/-5)
+- Count the occurence of an input target
+  * KO ID
+  * Pfam domain
+  * Keyword in assigned name
+- Export accumulated neighbours and occurence count
 
 ***
 
