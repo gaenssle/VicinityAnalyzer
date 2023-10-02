@@ -4,7 +4,7 @@
 # MODULE: DOWNLOAD PROTEIN DATA from KEGG
 # -> downloads information of protein entries by ID in chunks
 # -> downloads all organism ids available on KEGG and their taxonomic classification
-# -> downloads all motifs (domain architecture) of each given protein ID
+# -> downloads all neighbors within the given range of each given protein ID
 
 import pandas as pd
 from io import StringIO
@@ -14,6 +14,7 @@ from Bio.KEGG import REST
 import urllib.request
 import ssl
 ssl._create_default_https_context = ssl._create_unverified_context
+
 
 ##-------------------------------------------------------------------------------------------------
 ## DOWNLOAD FUNCTIONS -----------------------------------------------------------------------------
@@ -29,25 +30,38 @@ def DownloadOrthology(Input):
 
 
 ## ================================================================================================
+## Download all genome taxonomy from KEGG --> KEGG-list
+def DownloadOrganismsTemp(Name="organism"):
+	print("Download organism taxonomy. . .")
+	Entry = REST.kegg_list(Name).read()
+	Entry = Entry.replace(";" , "\t")
+	ColList = ["ID long", "orgID", "Organism", "Kingdom", "Phylum", "Class", "Order"]
+	DataFrame = pd.read_csv(StringIO(Entry), sep="\t", names=ColList)
+	DataFrame["Taxonomy"] = DataFrame["Kingdom"] + "-" + DataFrame["Phylum"]
+	DataFrame = DataFrame[["orgID","Taxonomy"]]
+	return(DataFrame)
+
+
+##-------------------------------------------------------------------------------------------------
+## SUB-FUNCTIONS OF DownloadNeighbors--------------------------------------------------------------
+##-------------------------------------------------------------------------------------------------
+## ================================================================================================
 ## Get list of indexes +/- range of the reference gene ID for KEGG
-def GetNeighborIndices(Gene, ManualList, Multi=1, Range=5, Size=4):
-	try:
-		List = []
-		if "_" in Gene and Gene.rsplit("_",1)[1].isdigit():
-			Label = Gene.rsplit("_",1)[0] + "_"
-			Index = int(Gene.rsplit("_",1)[1])
-			Fill = len(Gene.rsplit("_",1)[1])
-		else:
-			Label = Gene[:-Size]
-			Index = int(Gene[-Size:])
-			Fill = Size
-		for i in range(Index-Range*Multi,Index+Range*Multi+1, Multi):
-			if i != Index:
-				NewID = Label + str(i).zfill(Fill)
-				List.append(NewID)
-	except:
-		ManualList.append(Gene)
-	return(List, ManualList)
+def GetNeighborIndices(Gene, Range, Step, Size=4):
+	List = []
+	if "_" in Gene and Gene.rsplit("_",1)[1].isdigit():
+		Label = Gene.rsplit("_",1)[0] + "_"
+		Index = int(Gene.rsplit("_",1)[1])
+		Fill = len(Gene.rsplit("_",1)[1])
+	else:
+		Label = Gene[:-Size]
+		Index = int(Gene[-Size:])
+		Fill = Size
+	for i in range(Index-Range*Step,Index+Range*Step+1, Step):
+		if i != Index:
+			NewID = Label + str(i).zfill(Fill)
+			List.append(NewID)
+	return(List)
 
 
 ## ================================================================================================
@@ -65,6 +79,7 @@ def DownloadProteinEntries(List, GeneID):
 		else:
 			Entry.append(Line)
 	return(Data)
+
 
 ## ================================================================================================
 ## Download Info for each protein from KEGG
@@ -97,3 +112,24 @@ def GetDetailedData(Entry, GeneID, orgID):
 				Dict["Length"] = Line.split(" ",1)[1]
 				inAASeq = True
 	return(Dict)
+
+
+##-------------------------------------------------------------------------------------------------
+## MAIN FUNCTION ----------------------------------------------------------------------------------
+##-------------------------------------------------------------------------------------------------
+## ================================================================================================
+## Main function to download neighbors
+def DownloadNeighbors(GeneID, Range, Step=1):
+	Data = []
+	ProteinSet = []
+	IDList = GetNeighborIndices(GeneID, Range, Step)
+	if Range > 10:
+		# Create chunks of clusters since data of 10 proteins can be downloaded from KEGG at once
+		ClusteredList = [IDList[x:x+10] for x in range(0, len(IDList), 10)]
+	else:
+		ClusteredList = [IDList]
+	for Cluster in ClusteredList:
+		Data.extend(DownloadProteinEntries(IDList, GeneID))
+	for Entry in Data:
+		ProteinSet.append(GetDetailedData(Entry, GeneID, GeneID.split(":",1)[0]))
+	return(ProteinSet)

@@ -43,6 +43,10 @@ parser.add_argument("-r", "--range",
 	type=int)
 parser.add_argument("-f", "--folder", 
 	help="name of the parent folder (default: same as 'name')")
+parser.add_argument("-cs", "--clustersize", 
+	help="entries/frament files (default: %(default)s)", 
+	default=25, 
+	type=int)
 parser.add_argument("-ft", "--filetype", 
 	help="type of the generated files (default: %(default)s)", 
 	default=".csv")
@@ -70,50 +74,58 @@ if "a" in args.action:
 ## ------------------------------------------------------------------------------------------------
 ## ================================================================================================
 ## Get index list of neighbors and retrieves protein data
-def GetNeighbors(GeneList, FilePath, FileType, Sep, Ask):
-	ManualList = []
-	Complete = []
-	Incomplete = []
-	for GeneID in GeneList:
-		ProteinList = []
-		if GeneID.split(":",1)[1].isdigit() == False:
-			try:
-				List, ManualList = KEGG.GetNeighborIndices(GeneID, ManualList)
-				Data = KEGG.DownloadProteinEntries(List, GeneID)
-				if len(Data) < 6:
-					List, ManualList = KEGG.GetNeighborIndices(GeneID, ManualList, Multi=5)
-					Data = KEGG.DownloadProteinEntries(List, GeneID)
-			except:
-				try:
-					List, ManualList = KEGG.GetNeighborIndices(GeneID, ManualList, Multi=5)
-					Data = KEGG.DownloadProteinEntries(List, GeneID)
-					if len(Data) < 6:
-						List, ManualList = KEGG.GetNeighborIndices(GeneID, ManualList, Multi=10)
-						Data = KEGG.DownloadProteinEntries(List, GeneID)
-				except:
-					ManualList.append(GeneID)
-			for Entry in Data:
-				ProteinList.append(KEGG.GetDetailedData(Entry, GeneID, GeneID.split(":",1)[0]))
-			if len(Data) == 10:
-				Complete.extend(ProteinList)
-			else:
-				Incomplete.extend(ProteinList)
+def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
+	Organisms = None
+	print("Download protein data for", len(IDList), "IDs . . .")
+
+	# Create clusters of sequences to generate smaller files (in case the download crashes)
+	ClusteredList = [IDList[x:x+ClusterSize] for x in range(0, len(IDList), ClusterSize)]
+	for ClusterID in range(len(ClusteredList)):
+		print("Download cluster", ClusterID+1, "of", len(ClusteredList))
+		FragmentFile = FilePath + "_" + str(ClusterID+1)
+		print(FragmentFile)
+
+		# Ignore all files that have already been downloaded
+		if os.path.exists(FragmentFile + FileType):
+			print("File already exists, skip to next cluster\n")
+
+		# Download all files that have not yet been saved
 		else:
-			ManualList.append(GeneID)
-	print("Neighbors found:", len(Complete), "complete,", len(Incomplete), "incomplete; of", len(GeneList))
-	print("Manual search required for:", len(ManualList))
-	if Complete != []:
-		DataFrame = pd.DataFrame(Complete)
-		IE.ExportDataFrame(DataFrame, FilePath + "_Neighbors", 
-			FileType=FileType, Sep=Sep, Ask=Ask)
-	if Incomplete != []:
-		DataFrame = pd.DataFrame(Incomplete)
-		IE.ExportDataFrame(DataFrame, FilePath + "_Neighbors_incomplete", 
-			FileType=FileType, Sep=Sep, Ask=Ask)
-	if ManualList != []:
-		DataFrame = pd.DataFrame(ManualList, columns=["ID"])
-		IE.ExportDataFrame(DataFrame, FilePath + "_ManualDownload", 
-			FileType=FileType, Sep=Sep, Ask=Ask)
+			Neighbors = []
+			Count = 0
+			for GeneID in ClusteredList[ClusterID]:
+				try:
+					# Cycle through step size until the correct one is found
+					ProteinSet = KEGG.DownloadNeighbors(GeneID, Range, Step=1)
+					if len(ProteinSet) < Range + 1:
+						ProteinSet =  KEGG.DownloadNeighbors(GeneID, Range, Step=5)
+					if len(ProteinSet) < Range + 1:
+						ProteinSet =  KEGG.DownloadNeighbors(GeneID, Range, Step=10)
+
+					# Check if all entries for the range have been found 
+					if len(ProteinSet) == Range*2:
+						Status = "Complete"
+						Count += 1
+					else:
+						Status = "Incomplete"
+				except:
+					Status = "Error"
+					ProteinSet = [{"ID":GeneID}]
+				for Protein in ProteinSet:
+					Protein["Status"] = Status
+					Neighbors.append(Protein)
+
+			# Only download the list of organisms on KEGG if needed and add to dataframe
+			if Organisms is None:
+				Organisms = KEGG.DownloadOrganismsTemp()
+			ProteinTable = pd.DataFrame(Neighbors)
+			ProteinTable = pd.merge(ProteinTable, Organisms, on=["orgID"],  how="left")
+			IE.ExportDataFrame(ProteinTable, FragmentFile, FileType=FileType, Sep=Sep, Ask=Ask)
+			print("Done!\n->Neighbors found:", Count, "of", len(IDList), "complete")
+
+	# After all entries have been downloaded, combine all fragments into one dataframe
+	DataFrame = IE.CombineFiles(os.path.split(FragmentFile)[0], Sep, FileType)
+	return(DataFrame)
 
 
 
@@ -152,13 +164,15 @@ if any(s in ["i", "g"] for s in args.action):
 		IE.ExportDataFrame(DataFrame, OutputPath, 
 			FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
-	# print(IDList)
 
 
 # Find neighboring genes on KEGG
 	if "g" in args.action:
-		OutputPath = os.path.join(args.folder, "Output", args.folder + "_NeigbourIDs")
+		OutputPath = os.path.join(args.folder, "Output", args.folder + "_NeighborIDs")
 		FragmentFolder = IE.CreateFolder(OutputPath + "Fragments")
-		FragmentFile = os.path.join(FragmentFolder, args.folder + "_NeigbourIDs")
-		GetNeighbors(IDList, OutputPath, args.filetype, args.separator, args.askoverwrite)
-
+		FragmentFile = os.path.join(FragmentFolder, args.folder + "_NeighborIDs")
+		Detailed = GetNeighbors(IDList, FragmentFile, args.range, 
+			args.filetype, args.separator, args.askoverwrite, args.clustersize)
+		DataFrame = pd.merge(DataFrame, Detailed, on=["ID"],  how="right")
+		IE.ExportDataFrame(DataFrame, OutputPath, 
+			FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
