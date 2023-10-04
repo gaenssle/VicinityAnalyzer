@@ -28,11 +28,11 @@ parser.add_argument("-ask", "--askoverwrite",
 	help="ask before overwriting files",
 	action="store_true")
 parser.add_argument("-ti", "--targetID", 
-	help="target KO ID used for filtering (e.g. K21572)")
+	help="target KO ID(s) used for filtering (e.g. K21572)")
 parser.add_argument("-td", "--targetDomain", 
-	help="target domain(s) (Pfam) used for filtering (e.g. RagB,SusD-like)")
-parser.add_argument("-tk", "--targetKeyword", 
-	help="target keword(s) in annotation used for filtering (e.g. RagB,SusD)")
+	help="target domain name(s) (Pfam) used for filtering (e.g. RagB,SusD-like)")
+parser.add_argument("-tn", "--targetName", 
+	help="target keword(s) in name/annotation used for filtering (e.g. RagB,SusD)")
 parser.add_argument("-a", "--action", 
 	help="add actions to be conducted: "
 	"a=all, i=retrieve IDs, g=get neighbors, f=filter with target(default: %(default)s)", 
@@ -165,14 +165,37 @@ if any(s in ["i", "g"] for s in args.action):
 			FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
 
+# Get data from neighboring genes on KEGG
+if "g" in args.action:
+	OutputPath = os.path.join(args.folder, "Output", args.folder + "_Neighbors")
+	FragmentFolder = IE.CreateFolder(OutputPath + "_Fragments")
+	FragmentFile = os.path.join(FragmentFolder, args.folder + "_Neighbors")
+	Detailed = GetNeighbors(IDList, FragmentFile, args.range, 
+		args.filetype, args.separator, args.askoverwrite, args.clustersize)
+	IE.ExportDataFrame(Detailed, OutputPath, 
+		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
-# Find neighboring genes on KEGG
-	if "g" in args.action:
-		OutputPath = os.path.join(args.folder, "Output", args.folder + "_NeighborIDs")
-		FragmentFolder = IE.CreateFolder(OutputPath + "Fragments")
-		FragmentFile = os.path.join(FragmentFolder, args.folder + "_NeighborIDs")
-		Detailed = GetNeighbors(IDList, FragmentFile, args.range, 
-			args.filetype, args.separator, args.askoverwrite, args.clustersize)
-		DataFrame = pd.merge(DataFrame, Detailed, on=["ID"],  how="right")
-		IE.ExportDataFrame(DataFrame, OutputPath, 
-			FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
+# Get 
+if "f" in args.action:
+	FilePath = os.path.join(args.folder, "Output", args.folder)
+	InputFile = FilePath + "_Neighbors" + args.filetype
+	ProteinData = pd.read_csv(InputFile, sep=args.separator)
+	# if args.targetID:
+
+		# print(ProteinData.head(15))
+	# print(ProteinData["KO-ID"].str.contains(args.targetID).any())
+
+	# Set up dictionary of targets with Input:Type
+	TargetDict = {}
+	TargetInput = {"KO-ID": args.targetID, "Name": args.targetName, "Domain": args.targetDomain}
+	for Target in TargetInput:
+		if TargetInput[Target]:
+			TargetDict.update(dict.fromkeys(TargetInput[Target].split(","), Target))
+	print("The input targets are:\n",TargetDict)
+
+	# Cycle through all target and add boolean column
+	for Target in TargetDict:
+		NewColumn = TargetDict[Target][:2] + "-" + Target
+		SearchColumn = TargetDict[Target]
+		ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
+	print(ProteinData.head(15))

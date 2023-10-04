@@ -98,14 +98,14 @@ def GetDetailedData(Entry, GeneID, orgID):
 			if Line.startswith("ENTRY"):
 				Dict["ID"] += ":" + Line.split(" ",2)[1]
 			elif Line.startswith("NAME"):
-				Dict["Description"] = Line.split(" ",1)[1].replace("(GenBank)", "").strip()
+				Dict["Name"] = Line.split(" ",1)[1].replace("(GenBank)", "").strip()
 			elif Line.startswith("ORTHOLOGY"):
 				Dict["KO-ID"] = Line.split(" ",2)[1].strip()
 			elif Line.startswith("ORGANISM") or Line.startswith("VIRUS"):
 				Line = Line.split(" ",1)[1].strip()
 				Dict["Organism"] = Line.split(" ",1)[1]
 			elif Line.startswith("MOTIF"):
-				Dict["Domains"] = Line.split(" ",1)[1].replace("Pfam:", "").strip()
+				Dict["Domain"] = Line.split(" ",1)[1].replace("Pfam:", "").strip()
 			elif "UniProt" in Line:
 				Dict["UniProt"] = Line.split(" ",1)[1]
 			elif Line.startswith("AASEQ"):
