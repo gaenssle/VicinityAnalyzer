@@ -49,6 +49,7 @@ def DownloadOrganismsTemp(Name="organism"):
 ## Get list of indexes +/- range of the reference gene ID for KEGG
 def GetNeighborIndices(Gene, Range, Step, Size=4):
 	List = []
+	Dict = {}
 	if "_" in Gene and Gene.rsplit("_",1)[1].isdigit():
 		Label = Gene.rsplit("_",1)[0] + "_"
 		Index = int(Gene.rsplit("_",1)[1])
@@ -61,7 +62,8 @@ def GetNeighborIndices(Gene, Range, Step, Size=4):
 		if i != Index:
 			NewID = Label + str(i).zfill(Fill)
 			List.append(NewID)
-	return(List)
+			Dict[NewID] = int((i - Index)/Step)
+	return(List, Dict)
 
 
 ## ================================================================================================
@@ -122,14 +124,16 @@ def GetDetailedData(Entry, GeneID, orgID):
 def DownloadNeighbors(GeneID, Range, Step=1):
 	Data = []
 	ProteinSet = []
-	IDList = GetNeighborIndices(GeneID, Range, Step)
+	IDList, RangeDict = GetNeighborIndices(GeneID, Range, Step)
 	if Range > 10:
 		# Create chunks of clusters since data of 10 proteins can be downloaded from KEGG at once
 		ClusteredList = [IDList[x:x+10] for x in range(0, len(IDList), 10)]
 	else:
 		ClusteredList = [IDList]
 	for Cluster in ClusteredList:
-		Data.extend(DownloadProteinEntries(IDList, GeneID))
+		Data.extend(DownloadProteinEntries(Cluster, GeneID))
 	for Entry in Data:
 		ProteinSet.append(GetDetailedData(Entry, GeneID, GeneID.split(":",1)[0]))
+	for Entry in ProteinSet:
+		Entry["Pos"] = RangeDict[Entry["ID"]]
 	return(ProteinSet)

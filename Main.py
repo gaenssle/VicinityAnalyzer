@@ -41,8 +41,10 @@ parser.add_argument("-r", "--range",
 	help="+/- range in which genes will be searched (default: %(default)s)", 
 	default=5, 
 	type=int)
+parser.add_argument("-n", "--name",
+	help="name of files (default: same as 'input')")
 parser.add_argument("-f", "--folder", 
-	help="name of the parent folder (default: same as 'name')")
+	help="name of the parent folder (default: same as 'input')")
 parser.add_argument("-cs", "--clustersize", 
 	help="entries/frament files (default: %(default)s)", 
 	default=25, 
@@ -54,10 +56,33 @@ parser.add_argument("-sep", "--separator",
 	help="separator between columns in the output files (default: %(default)s)", 
 	default=";")
 
-# Set folder name to searched ID if not set
+
+
 args = parser.parse_args()
-if args.folder == None:
-    args.folder = args.input
+
+if all(target == None for target in [args.targetID, args.targetDomain, args.targetName]):
+	while True:
+		Continue = input("\nNo target for filtering were given\t->Do you want to continue without?"
+			"\n(y=yes, n=no)\n")
+		if Continue == "y":
+			break
+		elif Continue == "n":
+			print("Add the argmuments -ti (--targetID), -td (--targetDomain) or -tn (--targetName)"
+				"\nEnter 'Main.py -man' for more info")
+			quit()
+		else:
+			print("Please enter 'y' or 'no'!")
+
+
+# Set file and folder name
+if args.name == None:
+	if os.path.isfile(args.input):
+		args.folder, args.name = os.path.split(args.input)
+		args.name = args.name.rsplit(".",1)[0]
+	else:
+		args.name = input("\nPlease enter a name for the created files (e.g. Test)\n")
+		if args.folder == None:
+			args.folder = args.name
 
 # Check if the given action is valid and replace with the list if == 'a'
 while all(ch in "aigf" for ch in args.action) == False:
@@ -125,6 +150,7 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 
 	# After all entries have been downloaded, combine all fragments into one dataframe
 	DataFrame = IE.CombineFiles(os.path.split(FragmentFile)[0], Sep, FileType)
+	DataFrame["Length"] = DataFrame["Length"].fillna(0).astype(int)
 	return(DataFrame)
 
 
@@ -133,13 +159,13 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 ## SCRIPT -----------------------------------------------------------------------------------------
 ## ------------------------------------------------------------------------------------------------
 
-IE.CreateFolder(os.path.join(args.folder, "Input"))
 IE.CreateFolder(os.path.join(args.folder, "Output"))
+OutputName =  os.path.join(args.folder, "Output", args.name)
 
 
 # Retrieve Sequence IDs from input, file or KEGG
 if any(s in ["i", "g"] for s in args.action):
-	OutputPath = os.path.join(args.folder, "Input", args.folder)
+	OutputPath = os.path.join(args.folder, args.name)
 	if re.search(r"^K\d+$", args.input):
 		print("KO ID provided as input")
 		IDList, DataFrame = KEGG.DownloadOrthology(args.input)
@@ -167,9 +193,9 @@ if any(s in ["i", "g"] for s in args.action):
 
 # Get data from neighboring genes on KEGG
 if "g" in args.action:
-	OutputPath = os.path.join(args.folder, "Output", args.folder + "_Neighbors")
+	OutputPath = OutputName + "_Neighbors"
 	FragmentFolder = IE.CreateFolder(OutputPath + "_Fragments")
-	FragmentFile = os.path.join(FragmentFolder, args.folder + "_Neighbors")
+	FragmentFile = os.path.join(FragmentFolder, args.name + "_Neighbors")
 	Detailed = GetNeighbors(IDList, FragmentFile, args.range, 
 		args.filetype, args.separator, args.askoverwrite, args.clustersize)
 	IE.ExportDataFrame(Detailed, OutputPath, 
@@ -177,13 +203,8 @@ if "g" in args.action:
 
 # Get 
 if "f" in args.action:
-	FilePath = os.path.join(args.folder, "Output", args.folder)
-	InputFile = FilePath + "_Neighbors" + args.filetype
+	InputFile = OutputName + "_Neighbors" + args.filetype
 	ProteinData = pd.read_csv(InputFile, sep=args.separator)
-	# if args.targetID:
-
-		# print(ProteinData.head(15))
-	# print(ProteinData["KO-ID"].str.contains(args.targetID).any())
 
 	# Set up dictionary of targets with Input:Type
 	TargetDict = {}
@@ -194,8 +215,22 @@ if "f" in args.action:
 	print("The input targets are:\n",TargetDict)
 
 	# Cycle through all target and add boolean column
+	TargetColumns = []
 	for Target in TargetDict:
 		NewColumn = TargetDict[Target][:2] + "-" + Target
 		SearchColumn = TargetDict[Target]
 		ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
-	print(ProteinData.head(15))
+		TargetColumns.append(NewColumn)
+	# print(ProteinData.head(15))
+
+	# Count occcurences of each target at each range position
+	RangeCount = ProteinData.groupby('Pos')[TargetColumns] \
+		.apply(sum).reset_index()
+	IE.ExportDataFrame(RangeCount, OutputPath + "_RangeCount", 
+		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
+
+	# Count occcurences of each target for each entry
+	EntryCount = ProteinData.copy().groupby('Ref')[TargetColumns] \
+		.apply(sum).reset_index()
+	IE.ExportDataFrame(EntryCount, OutputPath + "_EntryCount", 
+		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
