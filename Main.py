@@ -33,6 +33,8 @@ parser.add_argument("-td", "--targetDomain",
 	help="target domain name(s) (Pfam) used for filtering (e.g. RagB,SusD-like)")
 parser.add_argument("-tn", "--targetName", 
 	help="target keword(s) in name/annotation used for filtering (e.g. RagB,SusD)")
+parser.add_argument("-tf", "--targetFile", 
+	help="File containing target;type pairs used for filtering (types=[KO-ID, Name, Domain], sep=-sep)")
 parser.add_argument("-a", "--action", 
 	help="add actions to be conducted: "
 	"a=all, i=retrieve IDs, g=get neighbors, f=filter with target(default: %(default)s)", 
@@ -60,19 +62,20 @@ parser.add_argument("-sep", "--separator",
 
 args = parser.parse_args()
 
-if all(target == None for target in [args.targetID, args.targetDomain, args.targetName]):
+# Check if targets were given
+if all(target == None for target in [args.targetID, args.targetDomain,
+	args.targetName, args.targetFile]):
 	while True:
 		Continue = input("\nNo target for filtering were given\t->Do you want to continue without?"
 			"\n(y=yes, n=no)\n")
 		if Continue == "y":
 			break
 		elif Continue == "n":
-			print("Add the argmuments -ti (--targetID), -td (--targetDomain) or -tn (--targetName)"
+			print("Add the argmuments -ti (--targetID), -td (--targetDomain), -tn (--targetName) or -tf (--targetFile)"
 				"\nEnter 'Main.py -man' for more info")
 			quit()
 		else:
 			print("Please enter 'y' or 'no'!")
-
 
 # Set file and folder name
 if args.name == None:
@@ -154,6 +157,20 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 	return(DataFrame)
 
 
+def GetTargets(targetID, targetDomain, targetName, targetFile, sep):
+	TargetDict = {}
+	TargetInput = {"KO-ID": targetID, "Name": targetName, "Domain": targetDomain}
+	for Target in TargetInput:
+		if TargetInput[Target]:
+			TargetDict.update(dict.fromkeys(TargetInput[Target].split(" "), Target))
+	if os.path.isfile(targetFile):
+		with open(targetFile) as File:
+			for Line in File:
+				(Key, Value) = Line.strip().split(sep)
+				TargetDict[Key] = Value
+	print("The input targets are:\n",TargetDict)
+	return(TargetDict)
+
 
 ## ------------------------------------------------------------------------------------------------
 ## SCRIPT -----------------------------------------------------------------------------------------
@@ -207,12 +224,8 @@ if "f" in args.action:
 	ProteinData = pd.read_csv(InputFile, sep=args.separator)
 
 	# Set up dictionary of targets with Input:Type
-	TargetDict = {}
-	TargetInput = {"KO-ID": args.targetID, "Name": args.targetName, "Domain": args.targetDomain}
-	for Target in TargetInput:
-		if TargetInput[Target]:
-			TargetDict.update(dict.fromkeys(TargetInput[Target].split(","), Target))
-	print("The input targets are:\n",TargetDict)
+	TargetDict = GetTargets(args.targetID, args.targetDomain, args.targetName, 
+		args.targetFile, args.separator)
 
 	# Cycle through all target and add boolean column
 	TargetColumns = []
