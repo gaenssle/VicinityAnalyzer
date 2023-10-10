@@ -71,7 +71,7 @@ if all(target == None for target in [args.targetID, args.targetDomain,
 			break
 		elif Continue == "n":
 			print("Add the argmuments -ti (--targetID), -td (--targetDomain), -tn (--targetName) or -tf (--targetFile)"
-				"\nEnter 'Main.py -man' for more info")
+				"\nEnter 'Main.py --help' for more info")
 			quit()
 		else:
 			print("Please enter 'y' or 'no'!")
