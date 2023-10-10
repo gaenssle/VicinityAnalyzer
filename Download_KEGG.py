@@ -71,7 +71,7 @@ def GetNeighborIndices(Gene, Range, Step, Size=4):
 def DownloadProteinEntries(List, GeneID):
 	Data = []
 	Entry = []
-	print("Download protein info for", GeneID, ". . .")
+	print("Download neighbors of", GeneID, ". . .")
 	Download = REST.kegg_get(List).read()
 	Download = Download.split("\n")
 	for Line in Download:
@@ -125,7 +125,7 @@ def DownloadNeighbors(GeneID, Range, Step=1):
 	Data = []
 	ProteinSet = []
 	IDList, RangeDict = GetNeighborIndices(GeneID, Range, Step)
-	if Range > 10:
+	if Range > 5:
 		# Create chunks of clusters since data of 10 proteins can be downloaded from KEGG at once
 		ClusteredList = [IDList[x:x+10] for x in range(0, len(IDList), 10)]
 	else:

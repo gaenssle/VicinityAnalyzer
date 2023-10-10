@@ -3,7 +3,6 @@
 
 import os
 import re
-from multiprocessing import Pool
 import pandas as pd
 import argparse
 
@@ -18,12 +17,12 @@ import Download_KEGG as KEGG
 
 parser = argparse.ArgumentParser(description="VICINITY ANALYZER"
 	"\nThis program downloads neighboring genes from KEGG genomes via KEGG.API"
-    "\nThe input is an id (single or list)"
+    "\nThe input is either a KO-ID or a list of gene IDs (in file or as list)"
     "\nAll gene IDs within the given range of the provided ID(s) are obtained from KEGG"
     "\nIt then downloads relevant details for each gene ID, e.g. organism and domain architecture"
-    "\nThe data can be counted regarding e.g. taxonomy, domain architecture and sequence length")
+    "\nThe occurrences of each provided target is counted per entry and per position")
 parser.add_argument("input", 
-	help="KO ID, KEGG gene ID or file containing KEGG gene IDs")
+	help="KO ID, KEGG gene ID(s) or file containing KEGG gene IDs (e.g. blb:BBMN68_1454,blf:BLIF_1909)")
 parser.add_argument("-ask", "--askoverwrite", 
 	help="ask before overwriting files",
 	action="store_true")
@@ -96,6 +95,7 @@ while all(ch in "aigf" for ch in args.action) == False:
 if "a" in args.action:
     args.action = "igf"
 
+print(args.range)
 
 ## ------------------------------------------------------------------------------------------------
 ## MAIN FUNCTIONS ---------------------------------------------------------------------------------
@@ -162,13 +162,13 @@ def GetTargets(targetID, targetDomain, targetName, targetFile, sep):
 	TargetInput = {"KO-ID": targetID, "Name": targetName, "Domain": targetDomain}
 	for Target in TargetInput:
 		if TargetInput[Target]:
-			TargetDict.update(dict.fromkeys(TargetInput[Target].split(" "), Target))
-	if os.path.isfile(targetFile):
+			TargetDict.update(dict.fromkeys(TargetInput[Target].split(","), Target))
+	if targetFile != None:
 		with open(targetFile) as File:
 			for Line in File:
 				(Key, Value) = Line.strip().split(sep)
 				TargetDict[Key] = Value
-	print("The input targets are:\n",TargetDict)
+	print("The input targets are:\n",TargetDict, "\n")
 	return(TargetDict)
 
 
@@ -184,14 +184,14 @@ OutputName =  os.path.join(args.folder, "Output", args.name)
 if any(s in ["i", "g"] for s in args.action):
 	OutputPath = os.path.join(args.folder, args.name)
 	if re.search(r"^K\d+$", args.input):
-		print("KO ID provided as input")
+		print("The input is a KO ID")
 		IDList, DataFrame = KEGG.DownloadOrthology(args.input)
 	elif os.path.exists(args.input):
-		print("File provided as input")
+		print("The input is a file")
 		DataFrame = pd.read_csv(args.input, sep=args.separator)
 		IDList = DataFrame[DataFrame.columns[0]].to_list()
 	elif ":" in args.input:
-		print("Gene ID provided as input")
+		print("The input is a (list of) gene ID(s)")
 		if "," in args.input:
 			IDList = args.input.split(",")
 		else:
@@ -234,11 +234,11 @@ if "f" in args.action:
 		SearchColumn = TargetDict[Target]
 		ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
 		TargetColumns.append(NewColumn)
-	# print(ProteinData.head(15))
 
 	# Count occcurences of each target at each range position
 	RangeCount = ProteinData.groupby('Pos')[TargetColumns] \
 		.apply(sum).reset_index()
+	print(RangeCount)
 	IE.ExportDataFrame(RangeCount, OutputPath + "_RangeCount", 
 		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
