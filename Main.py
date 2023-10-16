@@ -95,7 +95,9 @@ while all(ch in "aigf" for ch in args.action) == False:
 if "a" in args.action:
     args.action = "igf"
 
-print(args.range)
+# Check for tab separator
+if args.separator in ["\\t", "tab", "'\\t'", "{tab}"]:
+	args.separator = "\t"
 
 ## ------------------------------------------------------------------------------------------------
 ## MAIN FUNCTIONS ---------------------------------------------------------------------------------
