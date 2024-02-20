@@ -23,8 +23,8 @@ ssl._create_default_https_context = ssl._create_unverified_context
 ## Download all gene IDs associated with the supplied KEGG Orthology (KO)
 def DownloadOrthology(Input):
 	Download = REST.kegg_find("genes",Input).read()
-	List = Download.strip().split("\n")
-	ListOfList = [i.split("\t") for i in List]
+	GeneList = Download.strip().split("\n")
+	ListOfList = [i.split("\t") for i in GeneList]
 	DataFrame = pd.DataFrame(ListOfList, columns=["ID", "Description"])
 	return(DataFrame["ID"].to_list(), DataFrame)
 
@@ -48,8 +48,8 @@ def DownloadOrganismsTemp(Name="organism"):
 ## ================================================================================================
 ## Get list of indexes +/- range of the reference gene ID for KEGG
 def GetNeighborIndices(Gene, Range, Step, Size=4):
-	List = []
-	Dict = {}
+	IndexList = []
+	IndexDict = {}
 	if "_" in Gene and Gene.rsplit("_",1)[1].isdigit():
 		Label = Gene.rsplit("_",1)[0] + "_"
 		Index = int(Gene.rsplit("_",1)[1])
@@ -122,6 +122,7 @@ def GetDetailedData(Entry, GeneID, orgID):
 ## ================================================================================================
 ## Main function to download neighbors
 def DownloadNeighbors(GeneID, Range, Step=1):
+	print(f"Download neighbors of {GeneID} (Increment={Step}) . . .")
 	Data = []
 	ProteinSet = []
 	IDList, RangeDict = GetNeighborIndices(GeneID, Range, Step)

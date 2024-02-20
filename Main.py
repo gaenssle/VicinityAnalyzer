@@ -61,10 +61,21 @@ parser.add_argument("-sep", "--separator",
 
 args = parser.parse_args()
 
+# Check if the given action is valid and replace with the list if == 'a'
+while all(ch in "aigf" for ch in args.action) == False:
+    args.action = input("\nWhich action do you want to conduct?"
+        "\n- a\tconduct all actions\n- i\tdownload sequence IDs"
+        "\n- g\tget neighbors\n- f\tfilter with target\n"
+        "\nPlease enter any or multiple of letters (e.g 'a' or 'igf' [without ''])\n")
+if "a" in args.action:
+    args.action = "igf"
+
 # Check if targets were given
 if all(target == None for target in [args.targetID, args.targetDomain,
 	args.targetName, args.targetFile]):
 	while True:
+		if "f" not in args.action:
+			break
 		Continue = input("\nNo target for filtering were given\t->Do you want to continue without?"
 			"\n(y=yes, n=no)\n")
 		if Continue == "y":
@@ -86,14 +97,7 @@ if args.name == None:
 		if args.folder == None:
 			args.folder = args.name
 
-# Check if the given action is valid and replace with the list if == 'a'
-while all(ch in "aigf" for ch in args.action) == False:
-    args.action = input("\nWhich action do you want to conduct?"
-        "\n- a\tconduct all actions\n- i\tdownload sequence IDs"
-        "\n- g\tget neighbors\n- f\tfilter with target\n"
-        "\nPlease enter any or multiple of letters (e.g 'a' or 'igf' [without ''])\n")
-if "a" in args.action:
-    args.action = "igf"
+
 
 # Check for tab separator
 if args.separator in ["\\t", "tab", "'\\t'", "{tab}"]:
