@@ -61,18 +61,20 @@ def GetNeighborIndices(Gene, Range, Step, Size=4):
 	for i in range(Index-Range*Step,Index+Range*Step+1, Step):
 		if i != Index:
 			NewID = Label + str(i).zfill(Fill)
-			List.append(NewID)
-			Dict[NewID] = int((i - Index)/Step)
-	return(List, Dict)
+			IndexList.append(NewID)
+			IndexDict[NewID] = int((i - Index)/Step)
+	return(IndexList, IndexDict)
 
 
 ## ================================================================================================
 ## Download protein entries from KEGG -> in chunks of 10 gene IDs --> KEGG-get
-def DownloadProteinEntries(List, GeneID):
+def DownloadProteinEntries(IndexList, GeneID):
 	Data = []
 	Entry = []
-	print("Download neighbors of", GeneID, ". . .")
-	Download = REST.kegg_get(List).read()
+	try:
+		Download = REST.kegg_get(IndexList).read()
+	except:
+		Download = ""
 	Download = Download.split("\n")
 	for Line in Download:
 		if Line.startswith("///"):

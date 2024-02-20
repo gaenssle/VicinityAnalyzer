@@ -126,7 +126,6 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 		# Download all files that have not yet been saved
 		else:
 			Neighbors = []
-			Count = 0
 			for GeneID in ClusteredList[ClusterID]:
 				try:
 					# Cycle through step size until the correct one is found
@@ -139,12 +138,11 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 					# Check if all entries for the range have been found 
 					if len(ProteinSet) == Range*2:
 						Status = "Complete"
-						Count += 1
 					else:
 						Status = "Incomplete"
 				except:
 					Status = "Error"
-					ProteinSet = [{"ID":GeneID}]
+					ProteinSet = [{"Ref":GeneID}]
 				for Protein in ProteinSet:
 					Protein["Status"] = Status
 					Neighbors.append(Protein)
@@ -155,7 +153,10 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 			ProteinTable = pd.DataFrame(Neighbors)
 			ProteinTable = pd.merge(ProteinTable, Organisms, on=["orgID"],  how="left")
 			IE.ExportDataFrame(ProteinTable, FragmentFile, FileType=FileType, Sep=Sep, Ask=Ask)
-			print("Done!\n->Neighbors found:", Count, "of", len(IDList), "complete")
+			StatusCount = ProteinTable.groupby('Ref').first().reset_index()
+			StatusCount = StatusCount.groupby(["Status"]).size()
+			print(f"Done!\n->Neighbors found: {len(ClusteredList[ClusterID])} searched",
+				f"\n{StatusCount.to_string()}\n")
 
 	# After all entries have been downloaded, combine all fragments into one dataframe
 	DataFrame = IE.CombineFiles(os.path.split(FragmentFile)[0], Sep, FileType)
@@ -206,7 +207,7 @@ if any(s in ["i", "g"] for s in args.action):
 		IDList, DataFrame = KEGG.DownloadOrthology(args.input)
 	elif os.path.exists(args.input):
 		print("The input is a file")
-		DataFrame = pd.read_csv(args.input, sep=args.separator)
+		DataFrame = pd.read_csv(args.input, sep=args.separator, header=None)
 		IDList = DataFrame[DataFrame.columns[0]].to_list()
 	elif ":" in args.input:
 		print("The input is a (list of) gene ID(s)")
