@@ -159,17 +159,23 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 	return(DataFrame)
 
 
-def GetTargets(targetID, targetDomain, targetName, targetFile, sep):
+def GetTargets(targetID, targetDomain, targetName, targetFile, Sep):
 	TargetDict = {}
-	TargetInput = {"KO-ID": targetID, "Name": targetName, "Domain": targetDomain}
-	for Target in TargetInput:
-		if TargetInput[Target]:
-			TargetDict.update(dict.fromkeys(TargetInput[Target].split(","), Target))
+	TargetDict = {"KO-ID": targetID, "Name": targetName, "Domain": targetDomain}
+	for Target in TargetDict:
+		if TargetDict[Target]:
+			TargetDict[Target] = TargetDict[Target].split(",")
+		else:
+			TargetDict[Target] = []
 	if targetFile != None:
 		with open(targetFile) as File:
 			for Line in File:
-				(Key, Value) = Line.strip().split(sep)
-				TargetDict[Key] = Value
+				(Target, TargetType) = Line.strip().split(Sep)
+				try:
+					TargetDict[TargetType].append(Target)
+				except KeyError:
+					if TargetType != "Type":
+						print(f"\nDetected {TargetType} not in type list, will be ignored")
 	print("The input targets are:\n",TargetDict, "\n")
 	return(TargetDict)
 
@@ -178,8 +184,8 @@ def GetTargets(targetID, targetDomain, targetName, targetFile, sep):
 ## SCRIPT -----------------------------------------------------------------------------------------
 ## ------------------------------------------------------------------------------------------------
 
-IE.CreateFolder(os.path.join(args.folder, "Output"))
-OutputName =  os.path.join(args.folder, "Output", args.name)
+IE.CreateFolder(os.path.join(args.folder, "VicinityAnalysis"))
+OutputName =  os.path.join(args.folder, "VicinityAnalysis", args.name)
 
 
 # Retrieve Sequence IDs from input, file or KEGG
@@ -222,8 +228,8 @@ if "g" in args.action:
 
 # Get 
 if "f" in args.action:
-	InputFile = OutputName + "_Neighbors" + args.filetype
-	ProteinData = pd.read_csv(InputFile, sep=args.separator)
+	OutputPath = OutputName + "_Neighbors"
+	ProteinData = pd.read_csv(OutputPath + args.filetype, sep=args.separator)
 
 	# Set up dictionary of targets with Input:Type
 	TargetDict = GetTargets(args.targetID, args.targetDomain, args.targetName, 
@@ -231,11 +237,13 @@ if "f" in args.action:
 
 	# Cycle through all target and add boolean column
 	TargetColumns = []
-	for Target in TargetDict:
-		NewColumn = TargetDict[Target][:2] + "-" + Target
-		SearchColumn = TargetDict[Target]
-		ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
-		TargetColumns.append(NewColumn)
+	for TargetType in TargetDict:
+		for Target in TargetDict[TargetType]:
+			NewColumn = TargetType[:2] + "-" + Target
+			SearchColumn = TargetType
+			# print(TargetType, Target)
+			ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
+			TargetColumns.append(NewColumn)
 
 	# Count occcurences of each target at each range position
 	RangeCount = ProteinData.groupby('Pos')[TargetColumns] \

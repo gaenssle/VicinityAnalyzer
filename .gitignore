@@ -1,7 +1,6 @@
 test
-*.csv
-*.ods
 *.txt
+*.ods
 DUF*
 BACON*
 __pycache__
