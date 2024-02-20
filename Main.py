@@ -176,13 +176,19 @@ def GetTargets(targetID, targetDomain, targetName, targetFile, Sep):
 				except KeyError:
 					if TargetType != "Type":
 						print(f"\nDetected {TargetType} not in type list, will be ignored")
-	print("The input targets are:\n",TargetDict, "\n")
+	print(f"\nThe input targets are:\n{TargetDict}\n")
 	return(TargetDict)
 
 
 ## ------------------------------------------------------------------------------------------------
 ## SCRIPT -----------------------------------------------------------------------------------------
 ## ------------------------------------------------------------------------------------------------
+
+# Print program header
+print('\n{:=<70}'.format(''))
+print('{:=^70}'.format('  VICINITY ANALYZER  '))
+print('{:=<70}'.format(''))
+print('{: ^70}\n\n'.format('2024, by A.L.O. Gaenssle'))
 
 IE.CreateFolder(os.path.join(args.folder, "VicinityAnalysis"))
 OutputName =  os.path.join(args.folder, "VicinityAnalysis", args.name)
@@ -241,14 +247,13 @@ if "f" in args.action:
 		for Target in TargetDict[TargetType]:
 			NewColumn = TargetType[:2] + "-" + Target
 			SearchColumn = TargetType
-			# print(TargetType, Target)
 			ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
 			TargetColumns.append(NewColumn)
 
 	# Count occcurences of each target at each range position
 	RangeCount = ProteinData.groupby('Pos')[TargetColumns] \
 		.apply(sum).reset_index()
-	print(RangeCount)
+	print(f"\nFOUND TARGETS\n{RangeCount}\n\n")
 	IE.ExportDataFrame(RangeCount, OutputPath + "_RangeCount", 
 		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
@@ -257,3 +262,5 @@ if "f" in args.action:
 		.apply(sum).reset_index()
 	IE.ExportDataFrame(EntryCount, OutputPath + "_EntryCount", 
 		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
+
+print('{:=^70}'.format('  End of program  '))
