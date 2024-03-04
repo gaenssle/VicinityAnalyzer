@@ -69,5 +69,10 @@ def ExportDataFrame(DataFrame, FileName, Add="", Columns="",
 	FileName = CheckFileExists(FileName, Ask)
 	if Columns == "":
 		Columns = list(DataFrame)
-	DataFrame.to_csv(FileName, sep=Sep, columns = Columns, index=False, header=Header)
+	try:
+		DataFrame.to_csv(FileName, sep=Sep, columns = Columns, index=False, header=Header)
+		
+	# Account for mutlilevel index columns
+	except TypeError:
+		DataFrame.to_csv(FileName, sep=Sep, index=False, header=Header)
 	print("File saved as:", FileName, "\n")

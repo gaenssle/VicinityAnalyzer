@@ -255,6 +255,7 @@ if "f" in args.action:
 			ProteinData[NewColumn] = ProteinData[SearchColumn].str.contains(Target)
 			TargetColumns.append(NewColumn)
 
+
 	# Count occcurences of each target at each range position
 	RangeCount = ProteinData.groupby('Pos')[TargetColumns] \
 		.apply(sum).reset_index()
@@ -266,6 +267,15 @@ if "f" in args.action:
 	EntryCount = ProteinData.copy().groupby('Ref')[TargetColumns] \
 		.apply(sum).reset_index()
 	IE.ExportDataFrame(EntryCount, OutputPath + "_EntryCount", 
+		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
+
+	# Count occurences of each target type at each position and sum all in new columns
+	PositionCount = ProteinData[["Ref", "Pos"] + TargetColumns].copy()
+	PositionCount["SUM"] = PositionCount[TargetColumns].sum(axis=1)
+	PositionCount = PositionCount.pivot(index="Ref", columns="Pos", values=TargetColumns+["SUM"]) \
+	.reset_index().fillna(False)
+	PositionCount.replace({False: 0, True: 1}, inplace=True)
+	IE.ExportDataFrame(PositionCount, OutputPath + "_PositionCount", 
 		FileType=args.filetype, Sep=args.separator, Ask=args.askoverwrite)
 
 print('{:=^70}'.format('  End of program  '))
