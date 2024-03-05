@@ -161,6 +161,7 @@ def GetNeighbors(IDList, FilePath, Range, FileType, Sep, Ask, ClusterSize):
 	# After all entries have been downloaded, combine all fragments into one dataframe
 	DataFrame = IE.CombineFiles(os.path.split(FragmentFile)[0], Sep, FileType)
 	DataFrame["Length"] = DataFrame["Length"].fillna(0).astype(int)
+	DataFrame["Pos"] = DataFrame["Pos"].fillna(0).astype(int)
 	return(DataFrame)
 
 
@@ -241,6 +242,7 @@ if "g" in args.action:
 if "f" in args.action:
 	OutputPath = OutputName + "_Neighbors"
 	ProteinData = pd.read_csv(OutputPath + args.filetype, sep=args.separator)
+	ProteinData.drop(ProteinData.index[ProteinData["Status"] == "Error"], inplace = True)
 
 	# Set up dictionary of targets with Input:Type
 	TargetDict = GetTargets(args.targetID, args.targetDomain, args.targetName, 
@@ -271,7 +273,7 @@ if "f" in args.action:
 
 	# Count occurences of each target type at each position and sum all in new columns
 	PositionCount = ProteinData[["Ref", "Pos"] + TargetColumns].copy()
-	PositionCount["SUM"] = PositionCount[TargetColumns].sum(axis=1)
+	PositionCount["SUM"] = PositionCount[TargetColumns].sum(axis=1).astype(int)
 	PositionCount = PositionCount.pivot(index="Ref", columns="Pos", values=TargetColumns+["SUM"]) \
 	.reset_index().fillna(False)
 	PositionCount.replace({False: 0, True: 1}, inplace=True)
